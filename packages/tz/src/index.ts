@@ -2,20 +2,18 @@ import { DateTime } from 'luxon';
 
 // Full IANA zone list supported by the JS runtime (Node 18+).
 // Using this as the source of truth means we never hard-code a stale list.
-const ALL_ZONES =
-  typeof Intl.supportedValuesOf === 'function'
-    ? Intl.supportedValuesOf('timeZone')
-    : [];
+const ALL_ZONES: readonly string[] =
+  typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : [];
 
 if (ALL_ZONES.length === 0) {
   throw new Error(
-    'Intl.supportedValuesOf("timeZone") is unavailable. Please upgrade to Node.js 18.17 or newer.'
+    'Intl.supportedValuesOf("timeZone") is unavailable. Please upgrade to Node.js 18.17 or newer.',
   );
 }
 
-// Zones surfaced first when the user opens autocomplete with an empty query.
+// Featured zones, shown first when the autocomplete query is empty.
 // Ordered roughly west-to-east so the initial list reads like a world clock.
-const POPULAR = [
+const POPULAR: readonly string[] = [
   'Pacific/Honolulu',
   'America/Anchorage',
   'America/Los_Angeles',
@@ -40,26 +38,31 @@ const POPULAR = [
   'Australia/Perth',
   'Australia/Sydney',
   'Pacific/Auckland',
-  'UTC'
+  'UTC',
 ];
 
-export function isValidTimezone(tz) {
+export interface TimezoneChoice {
+  value: string;
+  label: string;
+}
+
+export function isValidTimezone(tz: unknown): tz is string {
   return typeof tz === 'string' && ALL_ZONES.includes(tz);
 }
 
 /**
- * Current UTC offset (in minutes) for a given IANA zone, accounting for DST.
- * Returns null if the zone is invalid.
+ * Current UTC offset in minutes for an IANA zone, DST-aware.
+ * Returns null for invalid zones.
  */
-export function getOffsetMinutes(tz) {
+export function getOffsetMinutes(tz: string): number | null {
   const dt = DateTime.now().setZone(tz);
   return dt.isValid ? dt.offset : null;
 }
 
 /**
- * Format a minutes-offset as "UTC", "UTC+5", "UTC-3:30", etc.
+ * Format a minutes-offset as a friendly UTC label: "UTC", "UTC+5", "UTC-3:30".
  */
-export function formatOffset(offsetMinutes) {
+export function formatOffset(offsetMinutes: number): string {
   if (offsetMinutes === 0) return 'UTC';
   const sign = offsetMinutes > 0 ? '+' : '-';
   const abs = Math.abs(offsetMinutes);
@@ -71,24 +74,24 @@ export function formatOffset(offsetMinutes) {
 /**
  * Human-friendly label: "UTC-5 / America/New_York".
  */
-export function formatLabel(tz) {
+export function formatLabel(tz: string): string {
   const offset = getOffsetMinutes(tz);
   if (offset === null) return tz;
   return `${formatOffset(offset)} / ${tz}`;
 }
 
 /**
- * Current local time in a zone, formatted as HH:mm.
+ * Current local time in a zone as HH:mm.
  */
-export function getCurrentTime(tz) {
+export function getCurrentTime(tz: string): string {
   return DateTime.now().setZone(tz).toFormat('HH:mm');
 }
 
 /**
- * Search zones for an autocomplete query. Matches IANA names, friendly city names,
- * and UTC offset strings. Returns up to `limit` results sorted by match quality and offset.
+ * Autocomplete search. Matches IANA names, city names, and UTC offset strings.
+ * Returns up to `limit` results, ranked by match quality then current offset.
  */
-export function searchTimezones(query, limit = 25) {
+export function searchTimezones(query: string | null | undefined, limit = 25): TimezoneChoice[] {
   const trimmed = (query ?? '').trim();
   const lower = trimmed.toLowerCase();
 
@@ -98,11 +101,11 @@ export function searchTimezones(query, limit = 25) {
       .map((tz) => ({ value: tz, label: formatLabel(tz) }));
   }
 
-  const results = [];
+  const results: Array<{ tz: string; score: number; offset: number }> = [];
   for (const tz of ALL_ZONES) {
     const tzLower = tz.toLowerCase();
     const label = formatLabel(tz).toLowerCase();
-    const city = tz.split('/').pop().replace(/_/g, ' ').toLowerCase();
+    const city = (tz.split('/').pop() ?? tz).replace(/_/g, ' ').toLowerCase();
 
     let score = -1;
     if (tzLower === lower) score = 0;
@@ -126,7 +129,7 @@ export function searchTimezones(query, limit = 25) {
 
   return results.slice(0, limit).map((r) => ({
     value: r.tz,
-    label: formatLabel(r.tz)
+    label: formatLabel(r.tz),
   }));
 }
 

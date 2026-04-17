@@ -1,0 +1,24 @@
+{
+  "name": "@tegutime/bot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "register": "tsx src/deploy-commands.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tegutime/db": "workspace:*",
+    "@tegutime/domain": "workspace:*",
+    "@tegutime/tz": "workspace:*",
+    "discord.js": "^14.16.3",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.6.3"
+  }
+}

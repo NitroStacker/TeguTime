@@ -1,16 +1,14 @@
-import { Events, ActivityType } from 'discord.js';
-import { refreshPinnedSheet } from '../pinnedSheet.js';
+import { Events, ActivityType, type Client } from 'discord.js';
+import { refreshPinnedSheet } from '../pinnedSheet';
 
 export const name = Events.ClientReady;
 export const once = true;
 
-export async function execute(client) {
+export async function execute(client: Client<true>): Promise<void> {
   console.log(`[ready] Logged in as ${client.user.tag}`);
   client.user.setActivity('timezones', { type: ActivityType.Watching });
 
-  // Refresh each guild's pinned sheet so changes that happened while
-  // the bot was offline (role moves, nickname edits, members leaving)
-  // are reconciled on startup.
+  // Reconcile pinned sheets on startup to catch changes that happened offline.
   for (const [, guild] of client.guilds.cache) {
     try {
       await refreshPinnedSheet(guild);

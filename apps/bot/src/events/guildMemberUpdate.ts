@@ -1,17 +1,19 @@
-import { Events } from 'discord.js';
-import { getUserTimezone } from '../db.js';
-import { refreshPinnedSheet } from '../pinnedSheet.js';
+import { Events, type GuildMember, type PartialGuildMember } from 'discord.js';
+import { getUserTimezone } from '@tegutime/domain';
+import { db } from '../db';
+import { refreshPinnedSheet } from '../pinnedSheet';
 
 export const name = Events.GuildMemberUpdate;
 
-export async function execute(oldMember, newMember) {
-  // Only bother refreshing if this user actually appears on the sheet.
-  if (!getUserTimezone(newMember.guild.id, newMember.id)) return;
+export async function execute(
+  oldMember: GuildMember | PartialGuildMember,
+  newMember: GuildMember,
+): Promise<void> {
+  if (!getUserTimezone(db, newMember.guild.id, newMember.id)) return;
 
-  // If old state is partial, we can't diff — refresh to be safe.
   if (oldMember.partial) {
     refreshPinnedSheet(newMember.guild).catch((err) =>
-      console.error('[guildMemberUpdate] refresh failed:', err)
+      console.error('[guildMemberUpdate] refresh failed:', err),
     );
     return;
   }
@@ -24,6 +26,6 @@ export async function execute(oldMember, newMember) {
   if (!nicknameChanged && !rolesChanged) return;
 
   refreshPinnedSheet(newMember.guild).catch((err) =>
-    console.error('[guildMemberUpdate] refresh failed:', err)
+    console.error('[guildMemberUpdate] refresh failed:', err),
   );
 }
