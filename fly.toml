@@ -1,0 +1,32 @@
+# fly.toml — Fly.io deployment config for the timezone bot.
+#
+# No [http_service] block on purpose: this bot opens an outbound WebSocket to
+# Discord's gateway and never receives inbound traffic, so Fly shouldn't try
+# to health-check a port or route public traffic to it.
+
+# `app` is filled in by `fly launch` or `fly apps create <name>`.
+# If you edit it by hand, the name must be globally unique on Fly.
+# app = "your-app-name"
+
+primary_region = "iad"   # Washington DC. Change to your nearest: lhr, fra, nrt, syd, etc.
+
+[build]
+
+[env]
+  NODE_ENV = "production"
+  DATABASE_PATH = "/data/timezones.db"
+
+# Persistent volume so the SQLite file survives machine restarts and redeploys.
+[mounts]
+  source = "timezone_data"
+  destination = "/data"
+
+# Re-register slash commands on every deploy so schema changes take effect.
+[deploy]
+  release_command = "node src/deploy-commands.js"
+
+# Smallest always-on machine — plenty for this bot.
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
