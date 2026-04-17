@@ -1775,7 +1775,8 @@ function buildEditArtModal(item: ArtItem): ModalBuilder {
     new ActionRowBuilder<TextInputBuilder>().addComponents(
       new TextInputBuilder()
         .setCustomId('caption')
-        .setLabel('Caption (leave empty to clear)')
+        .setLabel('Caption')
+        .setPlaceholder('Leave empty to clear')
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(false)
         .setMaxLength(1800)
@@ -1784,8 +1785,9 @@ function buildEditArtModal(item: ArtItem): ModalBuilder {
     new ActionRowBuilder<TextInputBuilder>().addComponents(
       new TextInputBuilder()
         .setCustomId('category')
-        .setLabel(
-          'Category — concept_art|ui|animation|environment|character|logo|screenshot|reference|other',
+        .setLabel('Category')
+        .setPlaceholder(
+          'concept_art | ui | animation | environment | character | logo | screenshot | reference | other',
         )
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
@@ -1795,7 +1797,8 @@ function buildEditArtModal(item: ArtItem): ModalBuilder {
     new ActionRowBuilder<TextInputBuilder>().addComponents(
       new TextInputBuilder()
         .setCustomId('tags')
-        .setLabel('Tags (comma separated)')
+        .setLabel('Tags')
+        .setPlaceholder('comma, separated')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setMaxLength(120)
@@ -1804,7 +1807,8 @@ function buildEditArtModal(item: ArtItem): ModalBuilder {
     new ActionRowBuilder<TextInputBuilder>().addComponents(
       new TextInputBuilder()
         .setCustomId('jam')
-        .setLabel('Jam ID (empty or 0 to clear)')
+        .setLabel('Jam ID')
+        .setPlaceholder('leave blank or 0 to detach')
         .setStyle(TextInputStyle.Short)
         .setRequired(false)
         .setMaxLength(10)
