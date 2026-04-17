@@ -96,15 +96,19 @@ export function renderArtItemEmbed(
  * Render a "my board / user board" landing card when the viewer hasn't yet
  * drilled into a specific item. Shows bio, counts, latest contributions, and
  * the featured piece if set.
+ *
+ * `ownerName` is the display name we want to show in the title (embed titles
+ * don't render `<@id>` mentions, so the caller must resolve it beforehand).
  */
 export function renderBoardLandingEmbed(
   ownerId: string,
+  ownerName: string,
   board: ArtboardRow | null,
   items: ArtItem[],
   freshUrlForFeatured: string | null,
 ): EmbedBuilder {
   const embed = new EmbedBuilder()
-    .setTitle(`🖼 <@${ownerId}>'s Artboard`)
+    .setTitle(`🖼 ${ownerName}'s Artboard`)
     .setColor(COLOR.PRIMARY);
 
   const lines: string[] = [];

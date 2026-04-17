@@ -44,6 +44,7 @@ import {
   renderJamGalleryEmbed,
 } from '../render/artEmbed';
 import { refreshDashboardMessage } from '../dashboard';
+import { resolveDisplayName } from '../userNames';
 
 function parseTags(raw: string | null | undefined): string[] {
   if (!raw) return [];
@@ -371,8 +372,9 @@ async function sendBoardLanding(
   const items = listArtItems(db, interaction.guildId, { ownerId, sort: 'new' });
   const featured = items.find((i) => i.id === board?.featuredItemId) ?? null;
   const freshUrl = featured ? await freshUrlFor(interaction.client, featured) : null;
+  const ownerName = await resolveDisplayName(interaction.guild, ownerId);
   await interaction.editReply({
-    embeds: [renderBoardLandingEmbed(ownerId, board, items, freshUrl)],
+    embeds: [renderBoardLandingEmbed(ownerId, ownerName, board, items, freshUrl)],
     content: items.length === 0
       ? '_No uploads yet — use `/art upload` to add the first piece._'
       : `_Use the dashboard → **Artboards** → **Browse** for paginated navigation. \`/art\` slash commands cover the basics here._`,

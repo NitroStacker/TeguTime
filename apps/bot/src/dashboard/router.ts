@@ -1054,6 +1054,7 @@ import {
 } from '../render/artEmbed';
 import { freshUrlFor } from '../artStorage';
 import type { DashboardRow } from './types';
+import { resolveDisplayName, resolveDisplayNames } from '../userNames';
 
 const ART_PAGE_SIZE = 1; // one item at a time — gallery feel
 
@@ -1119,14 +1120,20 @@ async function showBoardDirectory(
 
   const rows: DashboardRow[] = [];
   if (boards.length > 0) {
+    const names = await resolveDisplayNames(
+      interaction.guild,
+      boards.map((b) => b.userId),
+    );
     const select = new StringSelectMenuBuilder()
       .setCustomId(artBoardPickSelectId())
       .setPlaceholder('Pick a creator…')
       .addOptions(
         boards.slice(0, 25).map((b) =>
           new StringSelectMenuOptionBuilder()
-            .setLabel(`User ${b.userId.slice(-6)}`.slice(0, 100))
-            .setDescription(`${b.itemCount} items`)
+            .setLabel((names.get(b.userId) ?? 'Unknown user').slice(0, 100))
+            .setDescription(
+              `${b.itemCount} item${b.itemCount === 1 ? '' : 's'}`.slice(0, 100),
+            )
             .setValue(b.userId),
         ),
       );
@@ -1172,7 +1179,8 @@ async function showBoardView(
 
   if (items.length === 0) {
     const featuredUrl = null;
-    const embed = renderBoardLandingEmbed(ownerId, board, items, featuredUrl);
+    const ownerName = await resolveDisplayName(interaction.guild, ownerId);
+    const embed = renderBoardLandingEmbed(ownerId, ownerName, board, items, featuredUrl);
     const rows: DashboardRow[] = [
       new ActionRowBuilder<ButtonBuilder>().addComponents(
         new ButtonBuilder()
