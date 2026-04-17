@@ -37,6 +37,24 @@ export const data = new SlashCommandBuilder()
       )
   )
   .addSubcommand((sub) =>
+    sub
+      .setName('set-for')
+      .setDescription("Set another member's timezone (Manage Server required)")
+      .addUserOption((opt) =>
+        opt
+          .setName('user')
+          .setDescription('The member whose timezone to set')
+          .setRequired(true)
+      )
+      .addStringOption((opt) =>
+        opt
+          .setName('timezone')
+          .setDescription('Start typing a city, region, or UTC offset')
+          .setRequired(true)
+          .setAutocomplete(true)
+      )
+  )
+  .addSubcommand((sub) =>
     sub.setName('remove').setDescription('Remove your timezone from the sheet')
   )
   .addSubcommand((sub) =>
@@ -48,7 +66,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((sub) =>
     sub
       .setName('post-sheet')
-      .setDescription('Post or refresh the pinned timezone sheet (Manage Server required)')
+      .setDescription('Post or refresh the pinned timezone sheet in a channel')
       .addChannelOption((opt) =>
         opt
           .setName('channel')
@@ -77,6 +95,8 @@ export async function execute(interaction) {
   switch (sub) {
     case 'set':
       return handleSet(interaction);
+    case 'set-for':
+      return handleSetFor(interaction);
     case 'remove':
       return handleRemove(interaction);
     case 'me':
@@ -109,6 +129,53 @@ async function handleSet(interaction) {
 
   refreshPinnedSheet(interaction.guild).catch((err) =>
     console.error('[set] pinned refresh failed:', err)
+  );
+}
+
+async function handleSetFor(interaction) {
+  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
+    return interaction.reply({
+      content: "❌ You need the **Manage Server** permission to set another member's timezone.",
+      flags: MessageFlags.Ephemeral
+    });
+  }
+
+  const target = interaction.options.getUser('user', true);
+  const tz = interaction.options.getString('timezone', true);
+
+  if (target.bot) {
+    return interaction.reply({
+      content: '❌ Bots cannot have a timezone.',
+      flags: MessageFlags.Ephemeral
+    });
+  }
+
+  if (!isValidTimezone(tz)) {
+    return interaction.reply({
+      content: `❌ \`${tz}\` is not a valid IANA timezone. Please pick a suggestion from the autocomplete list.`,
+      flags: MessageFlags.Ephemeral
+    });
+  }
+
+  const member = await interaction.guild.members
+    .fetch(target.id)
+    .catch(() => null);
+  if (!member) {
+    return interaction.reply({
+      content: `❌ ${target} is not a member of this server.`,
+      flags: MessageFlags.Ephemeral
+    });
+  }
+
+  setUserTimezone(interaction.guildId, target.id, tz);
+
+  await interaction.reply({
+    content: `✅ Set ${target}'s timezone to **${formatLabel(tz)}** — local time **${getCurrentTime(tz)}**.`,
+    flags: MessageFlags.Ephemeral
+  });
+
+  refreshPinnedSheet(interaction.guild).catch((err) =>
+    console.error('[set-for] pinned refresh failed:', err)
   );
 }
 
@@ -152,13 +219,6 @@ async function handleSheet(interaction) {
 }
 
 async function handlePostSheet(interaction) {
-  if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild)) {
-    return interaction.reply({
-      content: '❌ You need the **Manage Server** permission to post the pinned sheet.',
-      flags: MessageFlags.Ephemeral
-    });
-  }
-
   let channel = interaction.options.getChannel('channel');
   if (!channel && config.pinnedChannelId) {
     channel = await interaction.guild.channels
@@ -225,6 +285,11 @@ async function handleHelp(interaction) {
           'Set your timezone. Start typing a city (`Tokyo`), a region (`Europe`), or an offset (`UTC-5`) and pick from the autocomplete suggestions.'
       },
       {
+        name: '/timezone set-for `<user> <timezone>`',
+        value:
+          "Set another member's timezone on their behalf. Useful for onboarding. Requires **Manage Server**."
+      },
+      {
         name: '/timezone remove',
         value: 'Remove yourself from the sheet.'
       },
@@ -239,7 +304,7 @@ async function handleHelp(interaction) {
       {
         name: '/timezone post-sheet `[channel]`',
         value:
-          'Post or refresh the **pinned** timezone sheet. Re-running it in the same channel updates the existing pin; pointing it at a new channel moves the pin. Requires **Manage Server**.'
+          'Post or refresh the **pinned** timezone sheet. Re-running it in the same channel updates the existing pin; pointing it at a new channel moves the pin.'
       },
       {
         name: '/timezone help',
