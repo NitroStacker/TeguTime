@@ -12,6 +12,7 @@ import { renderJamView } from './views/jam';
 import { renderTimezonesView } from './views/timezones';
 import { renderJobsView } from './views/jobs';
 import { renderAdminView } from './views/admin';
+import { renderArtboardsView } from './views/artboards';
 import type { DashboardContext, DashboardView } from './types';
 
 /**
@@ -29,6 +30,8 @@ export function renderView(ctx: DashboardContext, view: DashboardViewId): Dashbo
       return renderTimezonesView(ctx);
     case 'jobs':
       return renderJobsView(ctx);
+    case 'artboards':
+      return renderArtboardsView(ctx);
     case 'admin':
       return renderAdminView(ctx);
   }

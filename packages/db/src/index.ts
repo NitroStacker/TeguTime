@@ -56,6 +56,63 @@ const BOOTSTRAP_SQL = `
     updated_at      INTEGER NOT NULL
   );
 
+  -- Phase 3: artboard
+  CREATE TABLE IF NOT EXISTS art_settings (
+    guild_id            TEXT    PRIMARY KEY,
+    storage_channel_id  TEXT,
+    updated_at          INTEGER NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS artboards (
+    guild_id          TEXT    NOT NULL,
+    user_id           TEXT    NOT NULL,
+    bio               TEXT,
+    featured_item_id  INTEGER,
+    created_at        INTEGER NOT NULL,
+    updated_at        INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+  );
+
+  CREATE TABLE IF NOT EXISTS art_items (
+    id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id               TEXT    NOT NULL,
+    owner_id               TEXT    NOT NULL,
+    jam_id                 INTEGER,
+    storage_channel_id     TEXT    NOT NULL,
+    storage_message_id     TEXT    NOT NULL,
+    storage_attachment_id  TEXT    NOT NULL,
+    filename               TEXT    NOT NULL,
+    media_type             TEXT    NOT NULL,
+    content_type           TEXT    NOT NULL,
+    file_size_bytes        INTEGER NOT NULL,
+    width                  INTEGER,
+    height                 INTEGER,
+    title                  TEXT    NOT NULL,
+    caption                TEXT,
+    category               TEXT,
+    tags                   TEXT    NOT NULL DEFAULT '[]',
+    featured               INTEGER NOT NULL DEFAULT 0,
+    created_at             INTEGER NOT NULL,
+    updated_at             INTEGER NOT NULL,
+    deleted_at             INTEGER
+  );
+  CREATE INDEX IF NOT EXISTS art_items_guild_idx   ON art_items(guild_id);
+  CREATE INDEX IF NOT EXISTS art_items_owner_idx   ON art_items(guild_id, owner_id);
+  CREATE INDEX IF NOT EXISTS art_items_jam_idx     ON art_items(jam_id);
+  CREATE INDEX IF NOT EXISTS art_items_created_idx ON art_items(created_at);
+
+  CREATE TABLE IF NOT EXISTS art_mod_actions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    guild_id    TEXT    NOT NULL,
+    item_id     INTEGER NOT NULL,
+    mod_user_id TEXT    NOT NULL,
+    action      TEXT    NOT NULL,
+    reason      TEXT,
+    created_at  INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS art_mod_actions_guild_idx ON art_mod_actions(guild_id);
+  CREATE INDEX IF NOT EXISTS art_mod_actions_item_idx  ON art_mod_actions(item_id);
+
   -- Phase 1b: jams
   CREATE TABLE IF NOT EXISTS jams (
     id                       INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -8,6 +8,7 @@ import * as timezoneCmd from '../commands/timezone';
 import * as jamCmd from '../commands/jam';
 import * as jobCmd from '../commands/job';
 import * as dashboardCmd from '../commands/dashboard';
+import * as artCmd from '../commands/art';
 import { handleDashboardInteraction } from '../dashboard/router';
 
 type CommandModule = {
@@ -21,6 +22,7 @@ const commands = new Map<string, CommandModule>([
   ['jam', jamCmd as CommandModule],
   ['job', jobCmd as CommandModule],
   ['dashboard', dashboardCmd as CommandModule],
+  ['art', artCmd as CommandModule],
 ]);
 
 export const name = Events.InteractionCreate;

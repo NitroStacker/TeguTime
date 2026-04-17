@@ -1,13 +1,20 @@
 import { eq } from 'drizzle-orm';
 import { type Db, dashboards, type DashboardRow } from '@tegutime/db';
 
-export type DashboardViewId = 'home' | 'jam' | 'timezones' | 'jobs' | 'admin';
+export type DashboardViewId =
+  | 'home'
+  | 'jam'
+  | 'timezones'
+  | 'jobs'
+  | 'artboards'
+  | 'admin';
 
 export const DASHBOARD_VIEWS: DashboardViewId[] = [
   'home',
   'jam',
   'timezones',
   'jobs',
+  'artboards',
   'admin',
 ];
 

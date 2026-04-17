@@ -1,15 +1,22 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
 import {
   getJamStatus,
+  listArtItems,
+  listBoardOwners,
   listJams,
   listJobs,
-  summarizeJobs,
   listGuildTimezones,
+  summarizeJobs,
 } from '@tegutime/domain';
-import { discordTimestamp, formatDurationShort, formatOffset, getOffsetMinutes } from '@tegutime/tz';
+import {
+  discordTimestamp,
+  formatDurationShort,
+  formatOffset,
+  getOffsetMinutes,
+} from '@tegutime/tz';
 import { COLOR, JAM_STATUS_BADGE, JAM_STATUS_COLOR } from '../../render/theme';
 import { buildNavigationRow } from '../nav';
-import { homeQuickId, refreshId } from '../ids';
+import { homeAdminId, homeQuickId, refreshId } from '../ids';
 import type { DashboardContext, DashboardView } from '../types';
 
 function jamSummaryField(ctx: DashboardContext, now: number): { name: string; value: string } {
@@ -92,6 +99,25 @@ function timezonesSummaryField(ctx: DashboardContext): { name: string; value: st
   };
 }
 
+function artboardsSummaryField(ctx: DashboardContext): { name: string; value: string } {
+  const items = listArtItems(ctx.db, ctx.guild.id);
+  if (items.length === 0) {
+    return {
+      name: '🖼 Artboards',
+      value: '_No art uploaded yet. Use `/art upload` or the **Artboards** tab._',
+    };
+  }
+  const owners = listBoardOwners(ctx.db, ctx.guild.id);
+  const latest = items[0];
+  const lines = [
+    `**${items.length}** upload${items.length === 1 ? '' : 's'} from **${owners.length}** contributor${owners.length === 1 ? '' : 's'}`,
+  ];
+  if (latest) {
+    lines.push(`Latest: **${latest.title}** by <@${latest.ownerId}> · ${discordTimestamp(latest.createdAt, 'R')}`);
+  }
+  return { name: '🖼 Artboards', value: lines.join('\n') };
+}
+
 export function renderHome(ctx: DashboardContext): DashboardView {
   const now = Date.now();
   const jamField = jamSummaryField(ctx, now);
@@ -99,7 +125,9 @@ export function renderHome(ctx: DashboardContext): DashboardView {
     const jams = listJams(ctx.db, ctx.guild.id);
     const primary =
       jams.find((j) => getJamStatus(j, now) === 'live') ??
-      [...jams].sort((a, b) => a.startsAtUtc - b.startsAtUtc).find((j) => getJamStatus(j, now) === 'upcoming') ??
+      [...jams]
+        .sort((a, b) => a.startsAtUtc - b.startsAtUtc)
+        .find((j) => getJamStatus(j, now) === 'upcoming') ??
       jams[0];
     return primary ? getJamStatus(primary, now) : null;
   })();
@@ -110,15 +138,21 @@ export function renderHome(ctx: DashboardContext): DashboardView {
     .setTitle(`🎛 ${ctx.guild.name} · TeguTime Dashboard`)
     .setColor(color)
     .setDescription(
-      'Your server\'s control panel for jams, jobs, and timezones. ' +
+      "Your server's control panel for jams, jobs, timezones, and artboards. " +
         'Switch tabs below — the dashboard updates in place.',
     )
-    .addFields(jamField, jobsSummaryField(ctx), timezonesSummaryField(ctx))
+    .addFields(
+      jamField,
+      jobsSummaryField(ctx),
+      timezonesSummaryField(ctx),
+      artboardsSummaryField(ctx),
+    )
     .setFooter({ text: 'Refreshed' })
     .setTimestamp(new Date(now));
 
   const nav = buildNavigationRow('home', ctx.isAdmin);
 
+  // Row 2: personal quick actions + (for admins) a shortcut to the admin panel.
   const actions = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
       .setCustomId(refreshId())
@@ -140,6 +174,12 @@ export function renderHome(ctx: DashboardContext): DashboardView {
       .setEmoji('🕒')
       .setLabel('My Timezone')
       .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(homeAdminId())
+      .setEmoji('⚙️')
+      .setLabel('Admin')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(!ctx.isAdmin),
   );
 
   return { embeds: [embed], components: [nav, actions] };

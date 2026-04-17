@@ -57,3 +57,44 @@ export const jobActionId = (
 // --- admin ---
 export const adminPinSheetId = () => `${DASH_PREFIX}:admin:pinsheet`;
 export const adminRepostId = () => `${DASH_PREFIX}:admin:repost`;
+
+// --- home → admin shortcut ---
+export const homeAdminId = () => `${DASH_PREFIX}:home:admin`;
+
+// --- artboards ---
+export const artMyBoardBtnId = () => `${DASH_PREFIX}:art:myboard`;
+export const artBrowseBtnId = () => `${DASH_PREFIX}:art:browse`;
+export const artJamBtnId = () => `${DASH_PREFIX}:art:jam`;
+export const artUploadBtnId = () => `${DASH_PREFIX}:art:upload`;
+
+/** Browse a specific owner's items. State encoded as base10 "attId". */
+export const artBoardViewId = (ownerId: string, page: number) =>
+  `${DASH_PREFIX}:art:board:${ownerId}:${page}`;
+
+/** Jam gallery paginator. */
+export const artJamGalleryId = (jamId: number, page: number) =>
+  `${DASH_PREFIX}:art:jamview:${jamId}:${page}`;
+
+/** Pick one item from the current scope to view in detail. */
+export const artItemPickSelectId = (scope: string) =>
+  `${DASH_PREFIX}:art:pick:${scope}`;
+
+/** Pick an owner's board from the directory. */
+export const artBoardPickSelectId = () => `${DASH_PREFIX}:art:boardpick`;
+
+/** Pick a jam for the gallery. */
+export const artJamPickSelectId = () => `${DASH_PREFIX}:art:jampick`;
+
+/** Per-item action buttons inside an ephemeral detail view. */
+export const artItemActionId = (
+  action: 'edit' | 'delete' | 'feature' | 'unfeature' | 'modremove',
+  itemId: number,
+) => `${DASH_PREFIX}:art:item:${action}:${itemId}`;
+
+/** Modal to edit item metadata. */
+export const artEditModalId = (itemId: number) =>
+  `${DASH_PREFIX}:art:item:edit:${itemId}:submit`;
+
+/** Modal to set board bio. */
+export const artBioBtnId = () => `${DASH_PREFIX}:art:bio`;
+export const artBioModalId = () => `${DASH_PREFIX}:art:bio:submit`;

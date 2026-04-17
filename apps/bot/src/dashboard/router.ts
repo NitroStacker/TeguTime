@@ -23,14 +23,28 @@ import {
   createJam,
   createJob,
   editJam,
+  getArtItem,
+  getArtboard,
   getJam,
   getJob,
   getUserTimezone,
+  isArtCategory,
   isJobPriority,
+  listArtItems,
+  listBoardOwners,
+  listJams,
   listJobs,
+  recordModAction,
   removeUserTimezone,
+  setArtboardBio,
+  setArtboardFeatured,
   setJobStatus,
   setUserTimezone,
+  softDeleteArtItem,
+  summarizeJamGallery,
+  updateArtItem,
+  type ArtCategory,
+  type ArtItem,
   type DashboardViewId,
   type Job,
   type JobStatus,
@@ -51,6 +65,19 @@ import { COLOR, JOB_STATUS_BADGE, PRIORITY_BADGE } from '../render/theme';
 import { renderJobBoardEmbed } from '../render/jobEmbed';
 import { refreshPinnedSheet, postPinnedSheet } from '../pinnedSheet';
 import {
+  artBioBtnId,
+  artBioModalId,
+  artBoardPickSelectId,
+  artBoardViewId,
+  artBrowseBtnId,
+  artEditModalId,
+  artItemActionId,
+  artItemPickSelectId,
+  artJamBtnId,
+  artJamGalleryId,
+  artJamPickSelectId,
+  artMyBoardBtnId,
+  artUploadBtnId,
   DASH_PREFIX,
   jobActionId,
   jamCreateModalId,
@@ -107,6 +134,8 @@ export async function handleDashboardInteraction(
         return await handleJobs(interaction, action ?? '', args);
       case 'job':
         return await handleJobAction(interaction, action ?? '', args);
+      case 'art':
+        return await handleArt(interaction, action ?? '', args);
       case 'admin':
         return await handleAdmin(interaction, action ?? '');
       default:
@@ -194,6 +223,10 @@ async function handleHomeQuick(
       return await showMyJobs(interaction);
     case 'mytz':
       return await showMyTimezone(interaction);
+    case 'admin':
+      if (!isAdminComp(interaction)) return denyAdmin(interaction);
+      await updateDashboardInPlace(interaction, 'admin');
+      return true;
   }
   return false;
 }
@@ -660,6 +693,18 @@ async function dispatchModal(interaction: ModalSubmitInteraction<'cached'>): Pro
     await submitCreateJob(interaction);
     return;
   }
+  if (
+    interaction.customId.startsWith(DASH_PREFIX + ':art:item:edit:') &&
+    interaction.customId.endsWith(':submit')
+  ) {
+    const id = Number(interaction.customId.split(':')[4]);
+    await submitEditArt(interaction, id);
+    return;
+  }
+  if (interaction.customId === artBioModalId()) {
+    await submitBio(interaction);
+    return;
+  }
 }
 
 function buildCreateJamModal(): ModalBuilder {
@@ -995,6 +1040,731 @@ async function showMyTimezone(
     : 'You have not set a timezone yet. Open the **Timezones** tab and click **Set Mine**.';
   await interaction.reply({ content, flags: MessageFlags.Ephemeral });
   return true;
+}
+
+// -- Art (Artboard) --
+
+import type { StringSelectMenuInteraction as SSMI } from 'discord.js';
+import {
+  CATEGORY_LABEL,
+  renderArtItemEmbed,
+  renderBoardLandingEmbed,
+  renderBrowseDirectoryEmbed,
+  renderJamGalleryEmbed,
+} from '../render/artEmbed';
+import { freshUrlFor } from '../artStorage';
+import type { DashboardRow } from './types';
+
+const ART_PAGE_SIZE = 1; // one item at a time — gallery feel
+
+async function handleArt(
+  interaction: MessageComponentInteraction<'cached'>,
+  action: string,
+  args: string[],
+): Promise<boolean> {
+  switch (action) {
+    case 'myboard':
+      return await showBoardView(interaction, interaction.user.id, 0, 'reply');
+    case 'browse':
+      return await showBoardDirectory(interaction, 'reply');
+    case 'boardpick':
+      if (!interaction.isStringSelectMenu()) return false;
+      return await showBoardView(interaction, interaction.values[0] ?? '', 0, 'update');
+    case 'board': {
+      const ownerId = args[0] ?? '';
+      const page = Math.max(0, Number(args[1]) || 0);
+      return await showBoardView(interaction, ownerId, page, 'update');
+    }
+    case 'jam':
+      return await showJamSelector(interaction, 'reply');
+    case 'jampick':
+      if (!interaction.isStringSelectMenu()) return false;
+      return await showJamGalleryView(
+        interaction,
+        Number(interaction.values[0]),
+        0,
+        'update',
+      );
+    case 'jamview': {
+      const jamId = Number(args[0]);
+      const page = Math.max(0, Number(args[1]) || 0);
+      return await showJamGalleryView(interaction, jamId, page, 'update');
+    }
+    case 'pick':
+      if (!interaction.isStringSelectMenu()) return false;
+      return await handleItemPick(interaction, args, interaction.values[0] ?? '');
+    case 'upload':
+      return await showUploadGuide(interaction);
+    case 'bio':
+      return await openBioModal(interaction);
+    case 'item': {
+      const itemAction = args[0] ?? '';
+      const itemId = Number(args[1]);
+      return await handleItemAction(interaction, itemAction, itemId);
+    }
+  }
+  return false;
+}
+
+function responseMode(mode: 'reply' | 'update') {
+  return mode;
+}
+
+async function showBoardDirectory(
+  interaction: MessageComponentInteraction<'cached'>,
+  mode: 'reply' | 'update',
+): Promise<boolean> {
+  const boards = listBoardOwners(db, interaction.guildId);
+  const embed = renderBrowseDirectoryEmbed(boards);
+
+  const rows: DashboardRow[] = [];
+  if (boards.length > 0) {
+    const select = new StringSelectMenuBuilder()
+      .setCustomId(artBoardPickSelectId())
+      .setPlaceholder('Pick a creator…')
+      .addOptions(
+        boards.slice(0, 25).map((b) =>
+          new StringSelectMenuOptionBuilder()
+            .setLabel(`User ${b.userId.slice(-6)}`.slice(0, 100))
+            .setDescription(`${b.itemCount} items`)
+            .setValue(b.userId),
+        ),
+      );
+    rows.push(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select));
+  }
+  rows.push(
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(artMyBoardBtnId())
+        .setEmoji('🖼')
+        .setLabel('My Board')
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId(artJamBtnId())
+        .setEmoji('🎮')
+        .setLabel('Jam Gallery')
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(artUploadBtnId())
+        .setEmoji('⬆️')
+        .setLabel('Upload Art')
+        .setStyle(ButtonStyle.Success),
+    ),
+  );
+
+  const payload = { embeds: [embed], components: rows };
+  if (mode === 'reply') {
+    await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
+  } else {
+    await interaction.update(payload);
+  }
+  return true;
+}
+
+async function showBoardView(
+  interaction: MessageComponentInteraction<'cached'>,
+  ownerId: string,
+  page: number,
+  mode: 'reply' | 'update',
+): Promise<boolean> {
+  const board = getArtboard(db, interaction.guildId, ownerId);
+  const items = listArtItems(db, interaction.guildId, { ownerId, sort: 'new' });
+
+  if (items.length === 0) {
+    const featuredUrl = null;
+    const embed = renderBoardLandingEmbed(ownerId, board, items, featuredUrl);
+    const rows: DashboardRow[] = [
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(artBrowseBtnId())
+          .setEmoji('🏠')
+          .setLabel('Back to Browse')
+          .setStyle(ButtonStyle.Secondary),
+        ownerIsMe(interaction, ownerId)
+          ? new ButtonBuilder()
+              .setCustomId(artUploadBtnId())
+              .setEmoji('⬆️')
+              .setLabel('Upload Art')
+              .setStyle(ButtonStyle.Success)
+          : new ButtonBuilder()
+              .setCustomId(artMyBoardBtnId())
+              .setEmoji('🖼')
+              .setLabel('Go to My Board')
+              .setStyle(ButtonStyle.Primary),
+      ),
+    ];
+    const payload = { embeds: [embed], components: rows };
+    if (mode === 'reply') {
+      await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
+    } else {
+      await interaction.update(payload);
+    }
+    return true;
+  }
+
+  const bounded = Math.max(0, Math.min(page, items.length - 1));
+  const item = items[bounded]!;
+  const freshUrl = await freshUrlFor(interaction.client, item);
+  const embed = renderArtItemEmbed(item, freshUrl, {
+    position: { index: bounded, total: items.length },
+  });
+
+  const rows = buildItemViewerRows({
+    interaction,
+    item,
+    items,
+    page: bounded,
+    scope: { kind: 'board', ownerId },
+  });
+
+  const payload = { embeds: [embed], components: rows };
+  if (mode === 'reply') {
+    await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
+  } else {
+    await interaction.update(payload);
+  }
+  return true;
+}
+
+async function showJamSelector(
+  interaction: MessageComponentInteraction<'cached'>,
+  mode: 'reply' | 'update',
+): Promise<boolean> {
+  const jams = listJams(db, interaction.guildId, { includeArchived: true });
+  if (jams.length === 0) {
+    const payload = {
+      content: '_No jams exist yet. Ask an admin to create one, then come back._',
+      embeds: [],
+      components: [],
+    };
+    if (mode === 'reply') {
+      await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
+    } else {
+      await interaction.update(payload);
+    }
+    return true;
+  }
+  const select = new StringSelectMenuBuilder()
+    .setCustomId(artJamPickSelectId())
+    .setPlaceholder('Pick a jam…')
+    .addOptions(
+      jams.slice(0, 25).map((j) =>
+        new StringSelectMenuOptionBuilder()
+          .setLabel(`#${j.id} · ${j.title}`.slice(0, 100))
+          .setValue(String(j.id)),
+      ),
+    );
+  const rows: DashboardRow[] = [
+    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select),
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(artBrowseBtnId())
+        .setEmoji('🏠')
+        .setLabel('Back')
+        .setStyle(ButtonStyle.Secondary),
+    ),
+  ];
+  const embed = new EmbedBuilder()
+    .setTitle('🎮 Jam Gallery')
+    .setColor(COLOR.PRIMARY)
+    .setDescription('Pick a jam to see its gallery of contributions.');
+  const payload = { embeds: [embed], components: rows };
+  if (mode === 'reply') {
+    await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
+  } else {
+    await interaction.update(payload);
+  }
+  return true;
+}
+
+async function showJamGalleryView(
+  interaction: MessageComponentInteraction<'cached'>,
+  jamId: number,
+  page: number,
+  mode: 'reply' | 'update',
+): Promise<boolean> {
+  const jam = getJam(db, interaction.guildId, jamId);
+  if (!jam) {
+    await replyError(interaction, `❌ No jam with id \`${jamId}\`.`);
+    return true;
+  }
+  const items = listArtItems(db, interaction.guildId, { jamId, sort: 'new' });
+
+  if (items.length === 0) {
+    const summary = summarizeJamGallery(db, interaction.guildId, jamId);
+    const embed = renderJamGalleryEmbed(jam.title, summary);
+    const rows: DashboardRow[] = [
+      new ActionRowBuilder<ButtonBuilder>().addComponents(
+        new ButtonBuilder()
+          .setCustomId(artJamBtnId())
+          .setEmoji('🎮')
+          .setLabel('Pick another jam')
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId(artBrowseBtnId())
+          .setEmoji('🏠')
+          .setLabel('Back')
+          .setStyle(ButtonStyle.Secondary),
+      ),
+    ];
+    const payload = { embeds: [embed], components: rows };
+    if (mode === 'reply') {
+      await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
+    } else {
+      await interaction.update(payload);
+    }
+    return true;
+  }
+
+  const bounded = Math.max(0, Math.min(page, items.length - 1));
+  const item = items[bounded]!;
+  const freshUrl = await freshUrlFor(interaction.client, item);
+  const embed = renderArtItemEmbed(item, freshUrl, {
+    position: { index: bounded, total: items.length },
+    jamTitle: jam.title,
+  });
+
+  const rows = buildItemViewerRows({
+    interaction,
+    item,
+    items,
+    page: bounded,
+    scope: { kind: 'jam', jamId },
+  });
+
+  const payload = { embeds: [embed], components: rows };
+  if (mode === 'reply') {
+    await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
+  } else {
+    await interaction.update(payload);
+  }
+  return true;
+}
+
+function ownerIsMe(interaction: MessageComponentInteraction<'cached'>, ownerId: string): boolean {
+  return interaction.user.id === ownerId;
+}
+
+interface ItemViewerScope {
+  kind: 'board' | 'jam';
+  ownerId?: string;
+  jamId?: number;
+}
+
+function buildItemViewerRows({
+  interaction,
+  item,
+  items,
+  page,
+  scope,
+}: {
+  interaction: MessageComponentInteraction<'cached'>;
+  item: ArtItem;
+  items: ArtItem[];
+  page: number;
+  scope: { kind: 'board'; ownerId: string } | { kind: 'jam'; jamId: number };
+}): DashboardRow[] {
+  const admin = isAdminComp(interaction);
+  const isOwner = interaction.user.id === item.ownerId;
+  const canEdit = isOwner || admin;
+
+  const prevId =
+    scope.kind === 'board'
+      ? artBoardViewId(scope.ownerId, Math.max(0, page - 1))
+      : artJamGalleryId(scope.jamId, Math.max(0, page - 1));
+  const nextId =
+    scope.kind === 'board'
+      ? artBoardViewId(scope.ownerId, page + 1)
+      : artJamGalleryId(scope.jamId, page + 1);
+
+  const nav = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(prevId)
+      .setEmoji('◀')
+      .setLabel('Prev')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(page <= 0),
+    new ButtonBuilder()
+      .setCustomId(nextId)
+      .setEmoji('▶')
+      .setLabel('Next')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(page >= items.length - 1),
+    new ButtonBuilder()
+      .setCustomId(artItemActionId('edit', item.id))
+      .setEmoji('✏')
+      .setLabel('Edit')
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(!canEdit),
+    new ButtonBuilder()
+      .setCustomId(artItemActionId(item.featured ? 'unfeature' : 'feature', item.id))
+      .setEmoji('⭐')
+      .setLabel(item.featured ? 'Unfeature' : 'Feature')
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(!isOwner),
+    new ButtonBuilder()
+      .setCustomId(artItemActionId('delete', item.id))
+      .setEmoji('🗑')
+      .setLabel('Delete')
+      .setStyle(ButtonStyle.Danger)
+      .setDisabled(!canEdit),
+  );
+
+  const pickScope = scope.kind === 'board' ? `b-${scope.ownerId}` : `j-${scope.jamId}`;
+  const pickSelect = new StringSelectMenuBuilder()
+    .setCustomId(artItemPickSelectId(pickScope))
+    .setPlaceholder('Jump to item…')
+    .addOptions(
+      items.slice(0, 25).map((i, idx) =>
+        new StringSelectMenuOptionBuilder()
+          .setLabel(`${i.featured ? '⭐ ' : ''}${`#${i.id} · ${i.title}`.slice(0, 90)}`.slice(0, 100))
+          .setDescription(
+            `${i.mediaType}${i.category ? ' · ' + (CATEGORY_LABEL[i.category as ArtCategory] ?? i.category) : ''}`.slice(
+              0,
+              100,
+            ),
+          )
+          .setValue(String(i.id))
+          .setDefault(idx === page),
+      ),
+    );
+  const pickRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(pickSelect);
+
+  const backRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(scope.kind === 'board' ? artBrowseBtnId() : artJamBtnId())
+      .setEmoji('🏠')
+      .setLabel(scope.kind === 'board' ? 'Back to Browse' : 'Pick another jam')
+      .setStyle(ButtonStyle.Secondary),
+  );
+  if (admin && !isOwner) {
+    backRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId(artItemActionId('modremove', item.id))
+        .setEmoji('🛡')
+        .setLabel('Mod Remove')
+        .setStyle(ButtonStyle.Danger),
+    );
+  }
+  if (isOwner && scope.kind === 'board') {
+    backRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId(artBioBtnId())
+        .setEmoji('📝')
+        .setLabel('Edit Bio')
+        .setStyle(ButtonStyle.Secondary),
+    );
+  }
+
+  return [nav, pickRow, backRow];
+}
+
+async function handleItemPick(
+  interaction: SSMI<'cached'>,
+  args: string[],
+  chosenItemId: string,
+): Promise<boolean> {
+  const scopeKey = args[0] ?? '';
+  const itemId = Number(chosenItemId);
+  if (scopeKey.startsWith('b-')) {
+    const ownerId = scopeKey.slice(2);
+    const items = listArtItems(db, interaction.guildId, { ownerId, sort: 'new' });
+    const page = items.findIndex((i) => i.id === itemId);
+    return await showBoardView(interaction, ownerId, Math.max(0, page), 'update');
+  }
+  if (scopeKey.startsWith('j-')) {
+    const jamId = Number(scopeKey.slice(2));
+    const items = listArtItems(db, interaction.guildId, { jamId, sort: 'new' });
+    const page = items.findIndex((i) => i.id === itemId);
+    return await showJamGalleryView(interaction, jamId, Math.max(0, page), 'update');
+  }
+  return false;
+}
+
+async function handleItemAction(
+  interaction: MessageComponentInteraction<'cached'>,
+  action: string,
+  itemId: number,
+): Promise<boolean> {
+  const item = getArtItem(db, interaction.guildId, itemId);
+  if (!item || item.deletedAt) {
+    await replyError(interaction, '❌ That item no longer exists.');
+    return true;
+  }
+  const admin = isAdminComp(interaction);
+  const isOwner = interaction.user.id === item.ownerId;
+
+  if (action === 'edit') {
+    if (!(isOwner || admin)) {
+      await replyError(interaction, '❌ Only the owner or an admin can edit this item.');
+      return true;
+    }
+    await interaction.showModal(buildEditArtModal(item));
+    return true;
+  }
+  if (action === 'delete') {
+    if (!(isOwner || admin)) {
+      await replyError(interaction, '❌ Only the owner or an admin can delete this item.');
+      return true;
+    }
+    softDeleteArtItem(db, interaction.guildId, item.id);
+    if (!isOwner && admin) {
+      recordModAction(db, interaction.guildId, item.id, interaction.user.id, 'remove');
+    }
+    await interaction.update({
+      content: `🗑 **#${item.id}** deleted.`,
+      embeds: [],
+      components: [backToBrowseRow()],
+    });
+    await refreshDashboardMessage(interaction.client, interaction.guildId).catch(() => {});
+    return true;
+  }
+  if (action === 'feature') {
+    if (!isOwner) {
+      await replyError(interaction, '❌ Only the owner can feature their own art.');
+      return true;
+    }
+    setArtboardFeatured(db, interaction.guildId, item.ownerId, item.id);
+    updateArtItem(db, interaction.guildId, item.id, { featured: true });
+    await refreshFromItem(interaction, item.id);
+    return true;
+  }
+  if (action === 'unfeature') {
+    if (!isOwner && !admin) {
+      await replyError(interaction, '❌ Only the owner or an admin can unfeature.');
+      return true;
+    }
+    updateArtItem(db, interaction.guildId, item.id, { featured: false });
+    const board = getArtboard(db, interaction.guildId, item.ownerId);
+    if (board?.featuredItemId === item.id) {
+      setArtboardFeatured(db, interaction.guildId, item.ownerId, null);
+    }
+    if (!isOwner && admin) {
+      recordModAction(db, interaction.guildId, item.id, interaction.user.id, 'unfeature');
+    }
+    await refreshFromItem(interaction, item.id);
+    return true;
+  }
+  if (action === 'modremove') {
+    if (!admin) {
+      await replyError(interaction, '❌ Only admins can moderator-remove items.');
+      return true;
+    }
+    softDeleteArtItem(db, interaction.guildId, item.id);
+    recordModAction(db, interaction.guildId, item.id, interaction.user.id, 'remove');
+    await interaction.update({
+      content: `🛡 **#${item.id}** removed by moderator.`,
+      embeds: [],
+      components: [backToBrowseRow()],
+    });
+    await refreshDashboardMessage(interaction.client, interaction.guildId).catch(() => {});
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Re-render the ephemeral message to show the same item after a status change.
+ * Looks up the item's natural board context and navigates there.
+ */
+async function refreshFromItem(
+  interaction: MessageComponentInteraction<'cached'>,
+  itemId: number,
+): Promise<void> {
+  const item = getArtItem(db, interaction.guildId, itemId);
+  if (!item) return;
+  const items = listArtItems(db, interaction.guildId, { ownerId: item.ownerId, sort: 'new' });
+  const page = Math.max(0, items.findIndex((i) => i.id === itemId));
+  await showBoardView(interaction, item.ownerId, page, 'update');
+  await refreshDashboardMessage(interaction.client, interaction.guildId).catch(() => {});
+}
+
+function backToBrowseRow(): DashboardRow {
+  return new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(artBrowseBtnId())
+      .setEmoji('🏠')
+      .setLabel('Back to Browse')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId(artMyBoardBtnId())
+      .setEmoji('🖼')
+      .setLabel('My Board')
+      .setStyle(ButtonStyle.Primary),
+  );
+}
+
+async function showUploadGuide(
+  interaction: MessageComponentInteraction<'cached'>,
+): Promise<boolean> {
+  const embed = new EmbedBuilder()
+    .setTitle('⬆️ Upload Art')
+    .setColor(COLOR.PRIMARY)
+    .setDescription(
+      'Discord modals can\'t accept file attachments, so uploads go through a slash command.',
+    )
+    .addFields(
+      {
+        name: '1 · Run the command',
+        value:
+          '```/art upload file:<attach> title:My piece category:screenshot jam:1 tags:wip,boss```',
+      },
+      {
+        name: '2 · We archive it',
+        value:
+          'The bot forwards the file to a private storage channel so your upload keeps working even after Discord\'s CDN URLs expire.',
+      },
+      {
+        name: '3 · Browse it',
+        value: 'Your upload shows up in **My Board**, the jam gallery (if set), and the Home summary.',
+      },
+    )
+    .setFooter({
+      text: 'Supported: PNG, JPEG, WebP, GIF, APNG, MP4, WebM, MOV · max 25 MB',
+    });
+  await interaction.reply({
+    embeds: [embed],
+    flags: MessageFlags.Ephemeral,
+  });
+  return true;
+}
+
+async function openBioModal(
+  interaction: MessageComponentInteraction<'cached'>,
+): Promise<boolean> {
+  const board = getArtboard(db, interaction.guildId, interaction.user.id);
+  const modal = new ModalBuilder()
+    .setCustomId(artBioModalId())
+    .setTitle('Edit artboard bio');
+  const input = new TextInputBuilder()
+    .setCustomId('bio')
+    .setLabel('Bio (leave empty to clear)')
+    .setStyle(TextInputStyle.Paragraph)
+    .setRequired(false)
+    .setMaxLength(280)
+    .setValue(board?.bio ?? '');
+  modal.addComponents(
+    new ActionRowBuilder<TextInputBuilder>().addComponents(input),
+  );
+  await interaction.showModal(modal);
+  return true;
+}
+
+function buildEditArtModal(item: ArtItem): ModalBuilder {
+  const modal = new ModalBuilder()
+    .setCustomId(artEditModalId(item.id))
+    .setTitle(`Edit item #${item.id}`);
+  modal.addComponents(
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId('title')
+        .setLabel('Title')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(true)
+        .setMaxLength(100)
+        .setValue(item.title),
+    ),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId('caption')
+        .setLabel('Caption (leave empty to clear)')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(false)
+        .setMaxLength(1800)
+        .setValue(item.caption ?? ''),
+    ),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId('category')
+        .setLabel(
+          'Category — concept_art|ui|animation|environment|character|logo|screenshot|reference|other',
+        )
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setMaxLength(20)
+        .setValue(item.category ?? ''),
+    ),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId('tags')
+        .setLabel('Tags (comma separated)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setMaxLength(120)
+        .setValue(item.tags.join(', ')),
+    ),
+    new ActionRowBuilder<TextInputBuilder>().addComponents(
+      new TextInputBuilder()
+        .setCustomId('jam')
+        .setLabel('Jam ID (empty or 0 to clear)')
+        .setStyle(TextInputStyle.Short)
+        .setRequired(false)
+        .setMaxLength(10)
+        .setValue(item.jamId != null ? String(item.jamId) : ''),
+    ),
+  );
+  return modal;
+}
+
+async function submitEditArt(
+  interaction: ModalSubmitInteraction<'cached'>,
+  itemId: number,
+): Promise<void> {
+  const item = getArtItem(db, interaction.guildId, itemId);
+  if (!item || item.deletedAt) {
+    await replyError(interaction, '❌ That item no longer exists.');
+    return;
+  }
+  const admin = isAdminModal(interaction);
+  const isOwner = interaction.user.id === item.ownerId;
+  if (!(isOwner || admin)) {
+    await replyError(interaction, '❌ Only the owner or an admin can edit this item.');
+    return;
+  }
+  const title = interaction.fields.getTextInputValue('title').trim();
+  const caption = interaction.fields.getTextInputValue('caption').trim() || null;
+  const categoryRaw = interaction.fields.getTextInputValue('category').trim().toLowerCase();
+  const category: ArtCategory | null = categoryRaw === ''
+    ? null
+    : isArtCategory(categoryRaw)
+      ? categoryRaw
+      : null;
+  const tagsRaw = interaction.fields.getTextInputValue('tags');
+  const tags = tagsRaw
+    .split(',')
+    .map((t) => t.trim().toLowerCase())
+    .filter((t) => t.length > 0 && t.length <= 24)
+    .slice(0, 10);
+  const jamRaw = interaction.fields.getTextInputValue('jam').trim();
+  const jamId = jamRaw === '' || jamRaw === '0' ? null : Number(jamRaw);
+
+  const updated = updateArtItem(db, interaction.guildId, itemId, {
+    title,
+    caption,
+    category,
+    tags,
+    jamId,
+  });
+  if (!updated) {
+    await replyError(interaction, '❌ Update failed.');
+    return;
+  }
+  await interaction.reply({
+    content: `✅ Updated **#${updated.id}**.`,
+    flags: MessageFlags.Ephemeral,
+  });
+  await refreshDashboardMessage(interaction.client, interaction.guildId).catch(() => {});
+}
+
+async function submitBio(interaction: ModalSubmitInteraction<'cached'>): Promise<void> {
+  const raw = interaction.fields.getTextInputValue('bio').trim();
+  const bio = raw === '' ? null : raw;
+  setArtboardBio(db, interaction.guildId, interaction.user.id, bio);
+  await interaction.reply({
+    content: bio ? '✅ Bio updated.' : '✅ Bio cleared.',
+    flags: MessageFlags.Ephemeral,
+  });
+  await refreshDashboardMessage(interaction.client, interaction.guildId).catch(() => {});
 }
 
 // -- Permission shorthands --

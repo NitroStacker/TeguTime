@@ -40,6 +40,84 @@ export const dashboards = sqliteTable('dashboards', {
   updatedAt: integer('updated_at').notNull(),
 });
 
+// ---- Artboard (Phase 3) ----
+
+/**
+ * Per-guild artboard configuration. The storage channel is used by the bot
+ * to re-host uploaded attachments so we get render-time fresh signed URLs
+ * (Discord rotates them every ~24h).
+ */
+export const artSettings = sqliteTable('art_settings', {
+  guildId: text('guild_id').primaryKey(),
+  storageChannelId: text('storage_channel_id'),
+  updatedAt: integer('updated_at').notNull(),
+});
+
+export const artboards = sqliteTable(
+  'artboards',
+  {
+    guildId: text('guild_id').notNull(),
+    userId: text('user_id').notNull(),
+    bio: text('bio'),
+    featuredItemId: integer('featured_item_id'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.guildId, t.userId] }),
+  }),
+);
+
+export const artItems = sqliteTable(
+  'art_items',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    guildId: text('guild_id').notNull(),
+    ownerId: text('owner_id').notNull(),
+    jamId: integer('jam_id'),
+    storageChannelId: text('storage_channel_id').notNull(),
+    storageMessageId: text('storage_message_id').notNull(),
+    storageAttachmentId: text('storage_attachment_id').notNull(),
+    filename: text('filename').notNull(),
+    mediaType: text('media_type').notNull(), // 'image' | 'gif' | 'video'
+    contentType: text('content_type').notNull(),
+    fileSizeBytes: integer('file_size_bytes').notNull(),
+    width: integer('width'),
+    height: integer('height'),
+    title: text('title').notNull(),
+    caption: text('caption'),
+    category: text('category'),
+    tags: text('tags').notNull().default('[]'),
+    featured: integer('featured', { mode: 'boolean' }).notNull().default(false),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+    deletedAt: integer('deleted_at'),
+  },
+  (t) => ({
+    guildIdx: index('art_items_guild_idx').on(t.guildId),
+    ownerIdx: index('art_items_owner_idx').on(t.guildId, t.ownerId),
+    jamIdx: index('art_items_jam_idx').on(t.jamId),
+    createdIdx: index('art_items_created_idx').on(t.createdAt),
+  }),
+);
+
+export const artModActions = sqliteTable(
+  'art_mod_actions',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    guildId: text('guild_id').notNull(),
+    itemId: integer('item_id').notNull(),
+    modUserId: text('mod_user_id').notNull(),
+    action: text('action').notNull(), // 'remove' | 'feature' | 'unfeature'
+    reason: text('reason'),
+    createdAt: integer('created_at').notNull(),
+  },
+  (t) => ({
+    guildIdx: index('art_mod_actions_guild_idx').on(t.guildId),
+    itemIdx: index('art_mod_actions_item_idx').on(t.itemId),
+  }),
+);
+
 // ---- Jams (Phase 1b) ----
 
 export const jams = sqliteTable(
@@ -143,3 +221,7 @@ export type JamReminderRow = typeof jamReminders.$inferSelect;
 export type JobRow = typeof jobs.$inferSelect;
 export type JobCommentRow = typeof jobComments.$inferSelect;
 export type DashboardRow = typeof dashboards.$inferSelect;
+export type ArtSettingsRow = typeof artSettings.$inferSelect;
+export type ArtboardRow = typeof artboards.$inferSelect;
+export type ArtItemRow = typeof artItems.$inferSelect;
+export type ArtModActionRow = typeof artModActions.$inferSelect;

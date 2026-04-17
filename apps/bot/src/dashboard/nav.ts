@@ -7,25 +7,25 @@ interface TabSpec {
   id: DashboardViewId;
   label: string;
   emoji: string;
-  adminOnly?: boolean;
 }
 
+/**
+ * Five primary tabs. Admin is intentionally NOT here — it's reached via a
+ * dedicated button on Home (admin-only). That keeps the nav row at exactly
+ * 5 buttons while leaving admin actions one click away for those who need
+ * them.
+ */
 const TABS: TabSpec[] = [
   { id: 'home', label: 'Home', emoji: '🎛' },
   { id: 'jam', label: 'Jam', emoji: '🎮' },
   { id: 'timezones', label: 'Timezones', emoji: '🌍' },
   { id: 'jobs', label: 'Jobs', emoji: '📋' },
-  { id: 'admin', label: 'Admin', emoji: '⚙️', adminOnly: true },
+  { id: 'artboards', label: 'Artboards', emoji: '🖼' },
 ];
 
-/**
- * Build the navigation row. The current view is styled as Primary; the rest
- * are Secondary. Admin tab is disabled for non-admins so it stays visually
- * present (consistent layout) without being actionable.
- */
 export function buildNavigationRow(
   currentView: DashboardViewId,
-  isAdmin: boolean,
+  _isAdmin: boolean,
 ): DashboardRow {
   const row = new ActionRowBuilder<ButtonBuilder>();
   for (const tab of TABS) {
@@ -34,7 +34,6 @@ export function buildNavigationRow(
       .setLabel(tab.label)
       .setEmoji(tab.emoji)
       .setStyle(tab.id === currentView ? ButtonStyle.Primary : ButtonStyle.Secondary);
-    if (tab.adminOnly && !isAdmin) btn.setDisabled(true);
     row.addComponents(btn);
   }
   return row;
