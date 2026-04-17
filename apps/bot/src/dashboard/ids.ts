@@ -87,9 +87,13 @@ export const artJamPickSelectId = () => `${DASH_PREFIX}:art:jampick`;
 
 /** Per-item action buttons inside an ephemeral detail view. */
 export const artItemActionId = (
-  action: 'edit' | 'delete' | 'feature' | 'unfeature' | 'modremove',
+  action: 'edit' | 'delete' | 'feature' | 'unfeature' | 'modremove' | 'jam',
   itemId: number,
 ) => `${DASH_PREFIX}:art:item:${action}:${itemId}`;
+
+/** Select menu for retroactively attaching an item to a jam. */
+export const artItemSetJamSelectId = (itemId: number) =>
+  `${DASH_PREFIX}:art:item:setjam:${itemId}`;
 
 /** Modal to edit item metadata. */
 export const artEditModalId = (itemId: number) =>

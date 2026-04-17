@@ -73,6 +73,7 @@ import {
   artEditModalId,
   artItemActionId,
   artItemPickSelectId,
+  artItemSetJamSelectId,
   artJamBtnId,
   artJamGalleryId,
   artJamPickSelectId,
@@ -1445,6 +1446,15 @@ function buildItemViewerRows({
       .setLabel(scope.kind === 'board' ? 'Back to Browse' : 'Pick another jam')
       .setStyle(ButtonStyle.Secondary),
   );
+  if (canEdit) {
+    backRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId(artItemActionId('jam', item.id))
+        .setEmoji('🎮')
+        .setLabel(item.jamId != null ? 'Change Jam' : 'Attach to Jam')
+        .setStyle(ButtonStyle.Secondary),
+    );
+  }
   if (admin && !isOwner) {
     backRow.addComponents(
       new ButtonBuilder()
@@ -1568,7 +1578,91 @@ async function handleItemAction(
     await refreshDashboardMessage(interaction.client, interaction.guildId).catch(() => {});
     return true;
   }
+  if (action === 'jam') {
+    if (!(isOwner || admin)) {
+      await replyError(interaction, '❌ Only the owner or an admin can change the jam.');
+      return true;
+    }
+    await showJamAttachPicker(interaction, item);
+    return true;
+  }
+  if (action === 'setjam') {
+    if (!interaction.isStringSelectMenu()) return false;
+    if (!(isOwner || admin)) {
+      await replyError(interaction, '❌ Only the owner or an admin can change the jam.');
+      return true;
+    }
+    const raw = interaction.values[0] ?? 'none';
+    const newJamId = raw === 'none' ? null : Number(raw);
+    if (newJamId !== null && !Number.isFinite(newJamId)) {
+      await replyError(interaction, '❌ Invalid jam selection.');
+      return true;
+    }
+    if (newJamId !== null && !getJam(db, interaction.guildId, newJamId)) {
+      await replyError(interaction, `❌ No jam with id \`${newJamId}\`.`);
+      return true;
+    }
+    updateArtItem(db, interaction.guildId, item.id, { jamId: newJamId });
+    await refreshFromItem(interaction, item.id);
+    return true;
+  }
   return false;
+}
+
+/**
+ * Ephemeral jam picker so users can retroactively attach an item to a jam
+ * without knowing the numeric ID. Replaces the current ephemeral's content
+ * with a select + Cancel button; applying the change navigates back to the
+ * item viewer.
+ */
+async function showJamAttachPicker(
+  interaction: MessageComponentInteraction<'cached'>,
+  item: ArtItem,
+): Promise<void> {
+  const jams = listJams(db, interaction.guildId, { includeArchived: true });
+  const options: StringSelectMenuOptionBuilder[] = [
+    new StringSelectMenuOptionBuilder()
+      .setLabel('No jam')
+      .setDescription('Remove this piece from any jam gallery')
+      .setEmoji('➖')
+      .setValue('none')
+      .setDefault(item.jamId == null),
+    ...jams.slice(0, 24).map((j) =>
+      new StringSelectMenuOptionBuilder()
+        .setLabel(`#${j.id} · ${j.title}`.slice(0, 100))
+        .setValue(String(j.id))
+        .setDefault(item.jamId === j.id),
+    ),
+  ];
+
+  const select = new StringSelectMenuBuilder()
+    .setCustomId(artItemSetJamSelectId(item.id))
+    .setPlaceholder('Attach this piece to a jam…')
+    .addOptions(options);
+
+  const rows: DashboardRow[] = [
+    new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(select),
+    new ActionRowBuilder<ButtonBuilder>().addComponents(
+      new ButtonBuilder()
+        .setCustomId(artBoardViewId(item.ownerId, 0))
+        .setEmoji('↩')
+        .setLabel('Cancel')
+        .setStyle(ButtonStyle.Secondary),
+    ),
+  ];
+
+  const embed = new EmbedBuilder()
+    .setTitle(`🎮 Attach #${item.id} to a jam`)
+    .setColor(COLOR.PRIMARY)
+    .setDescription(
+      jams.length === 0
+        ? '_No jams exist yet — an admin needs to create one with `/jam create` or the Jam tab._'
+        : item.jamId != null
+          ? `Currently on **jam #${item.jamId}**. Pick a different jam below, or choose **No jam** to detach.`
+          : 'This piece isn\'t attached to any jam yet. Pick one below to have it appear in that jam\'s gallery.',
+    );
+
+  await interaction.update({ embeds: [embed], components: rows });
 }
 
 /**
