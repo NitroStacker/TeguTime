@@ -1044,6 +1044,7 @@ async function showMyTimezone(
 import type { StringSelectMenuInteraction as SSMI } from 'discord.js';
 import {
   CATEGORY_LABEL,
+  attachmentsForItem,
   renderArtItemEmbed,
   renderBoardLandingEmbed,
   renderBrowseDirectoryEmbed,
@@ -1157,7 +1158,7 @@ async function showBoardDirectory(
     ),
   );
 
-  const payload = { embeds: [embed], components: rows };
+  const payload = { embeds: [embed], components: rows, files: [] };
   if (mode === 'reply') {
     await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
   } else {
@@ -1199,7 +1200,7 @@ async function showBoardView(
               .setStyle(ButtonStyle.Primary),
       ),
     ];
-    const payload = { embeds: [embed], components: rows };
+    const payload = { embeds: [embed], components: rows, files: [] };
     if (mode === 'reply') {
       await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
     } else {
@@ -1223,7 +1224,10 @@ async function showBoardView(
     scope: { kind: 'board', ownerId },
   });
 
-  const payload = { embeds: [embed], components: rows };
+  const files = attachmentsForItem(item, freshUrl);
+  // Always pass `files` explicitly — interaction.update preserves attachments
+  // otherwise, which would leave a stale video playing on the next item.
+  const payload = { embeds: [embed], components: rows, files };
   if (mode === 'reply') {
     await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
   } else {
@@ -1274,7 +1278,7 @@ async function showJamSelector(
     .setTitle('🎮 Jam Gallery')
     .setColor(COLOR.PRIMARY)
     .setDescription('Pick a jam to see its gallery of contributions.');
-  const payload = { embeds: [embed], components: rows };
+  const payload = { embeds: [embed], components: rows, files: [] };
   if (mode === 'reply') {
     await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
   } else {
@@ -1313,7 +1317,7 @@ async function showJamGalleryView(
           .setStyle(ButtonStyle.Secondary),
       ),
     ];
-    const payload = { embeds: [embed], components: rows };
+    const payload = { embeds: [embed], components: rows, files: [] };
     if (mode === 'reply') {
       await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
     } else {
@@ -1338,7 +1342,8 @@ async function showJamGalleryView(
     scope: { kind: 'jam', jamId },
   });
 
-  const payload = { embeds: [embed], components: rows };
+  const files = attachmentsForItem(item, freshUrl);
+  const payload = { embeds: [embed], components: rows, files };
   if (mode === 'reply') {
     await interaction.reply({ ...payload, flags: MessageFlags.Ephemeral });
   } else {
@@ -1530,6 +1535,7 @@ async function handleItemAction(
       content: `🗑 **#${item.id}** deleted.`,
       embeds: [],
       components: [backToBrowseRow()],
+      files: [],
     });
     await refreshDashboardMessage(interaction.client, interaction.guildId).catch(() => {});
     return true;
@@ -1571,6 +1577,7 @@ async function handleItemAction(
       content: `🛡 **#${item.id}** removed by moderator.`,
       embeds: [],
       components: [backToBrowseRow()],
+      files: [],
     });
     await refreshDashboardMessage(interaction.client, interaction.guildId).catch(() => {});
     return true;
@@ -1659,7 +1666,7 @@ async function showJamAttachPicker(
           : 'This piece isn\'t attached to any jam yet. Pick one below to have it appear in that jam\'s gallery.',
     );
 
-  await interaction.update({ embeds: [embed], components: rows });
+  await interaction.update({ embeds: [embed], components: rows, files: [] });
 }
 
 /**

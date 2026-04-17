@@ -39,6 +39,7 @@ import {
 } from '../artStorage';
 import {
   CATEGORY_LABEL,
+  attachmentsForItem,
   renderArtItemEmbed,
   renderBoardLandingEmbed,
   renderBrowseDirectoryEmbed,
@@ -351,6 +352,7 @@ async function handleUpload(interaction: ChatInputCommandInteraction<'cached'>):
     await interaction.editReply({
       content: `✅ Uploaded as **#${item.id} · ${item.title}**. View it on the dashboard → Artboards → My Board, or with \`/art my-board\`.`,
       embeds: [renderArtItemEmbed(item, rehosted.url)],
+      files: attachmentsForItem(item, rehosted.url),
     });
     await refreshDashboardMessage(interaction.client, interaction.guildId).catch(() => {});
   } catch (err) {

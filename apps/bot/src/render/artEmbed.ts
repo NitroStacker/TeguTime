@@ -83,6 +83,16 @@ export function renderArtItemEmbed(
   if (freshUrl && item.mediaType !== 'video') {
     embed.setImage(freshUrl);
   }
+  // For videos, the caller should also attach the file to the message so
+  // Discord's inline player renders. We add a visible "Watch" link here as
+  // a graceful fallback if the attach ever fails.
+  if (freshUrl && item.mediaType === 'video') {
+    embed.addFields({
+      name: 'Video',
+      value: `▶ [Watch ${item.filename}](${freshUrl})`,
+      inline: false,
+    });
+  }
 
   const footer = opts.position
     ? `Item ${opts.position.index + 1} / ${opts.position.total} · Uploaded`
@@ -90,6 +100,21 @@ export function renderArtItemEmbed(
   embed.setFooter({ text: footer }).setTimestamp(new Date(item.createdAt));
 
   return embed;
+}
+
+/**
+ * Build the `files` array for an interaction response when an item is a
+ * video — attaching the file makes Discord show its native inline player
+ * underneath the embed. Returns `[]` for non-video items so callers can
+ * always pass the result through unchanged (and clear any stale video
+ * attachment when navigating to a non-video item).
+ */
+export function attachmentsForItem(
+  item: ArtItem,
+  freshUrl: string | null,
+): Array<{ attachment: string; name: string }> {
+  if (item.mediaType !== 'video' || !freshUrl) return [];
+  return [{ attachment: freshUrl, name: item.filename }];
 }
 
 /**
