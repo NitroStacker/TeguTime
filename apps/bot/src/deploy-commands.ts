@@ -1,8 +1,10 @@
 import { REST, Routes } from 'discord.js';
 import { config } from './config';
 import { data as timezoneData } from './commands/timezone';
+import { data as jamData } from './commands/jam';
+import { data as jobData } from './commands/job';
 
-const commands = [timezoneData.toJSON()];
+const commands = [timezoneData.toJSON(), jamData.toJSON(), jobData.toJSON()];
 const rest = new REST({ version: '10' }).setToken(config.token);
 
 try {

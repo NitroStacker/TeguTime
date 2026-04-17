@@ -14,7 +14,8 @@
     "@tegutime/domain": "workspace:*",
     "@tegutime/tz": "workspace:*",
     "discord.js": "^14.16.3",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.36.4"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

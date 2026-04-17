@@ -133,4 +133,79 @@ export function searchTimezones(query: string | null | undefined, limit = 25): T
   }));
 }
 
+// ---- Scheduling helpers (Phase 1b) ----
+
+/**
+ * Parse a user-entered date/time string in the given IANA timezone and return
+ * it as a UTC epoch millisecond timestamp. Returns null for invalid input.
+ *
+ * Accepted formats:
+ *   - `yyyy-MM-dd HH:mm`       (24-hour, e.g. "2026-04-20 14:00")
+ *   - `yyyy-MM-dd HH:mm:ss`
+ *   - `yyyy-MM-ddTHH:mm`       (ISO-ish, e.g. "2026-04-20T14:00")
+ *   - `yyyy-MM-ddTHH:mm:ss`
+ */
+export function parseDateTimeInZone(input: string, tz: string): number | null {
+  if (!input || !isValidTimezone(tz)) return null;
+  const trimmed = input.trim();
+
+  const formats = [
+    'yyyy-MM-dd HH:mm',
+    'yyyy-MM-dd HH:mm:ss',
+    "yyyy-MM-dd'T'HH:mm",
+    "yyyy-MM-dd'T'HH:mm:ss",
+  ];
+
+  for (const format of formats) {
+    const dt = DateTime.fromFormat(trimmed, format, { zone: tz });
+    if (dt.isValid) return dt.toMillis();
+  }
+
+  // Graceful fallback — try luxon's ISO parser as a last resort.
+  const iso = DateTime.fromISO(trimmed, { zone: tz });
+  return iso.isValid ? iso.toMillis() : null;
+}
+
+/**
+ * Discord native timestamp tag. Rendered by each viewer's client in their
+ * local timezone automatically. Pass a UTC epoch ms value.
+ */
+export function discordTimestamp(
+  utcMs: number,
+  style: 't' | 'T' | 'd' | 'D' | 'f' | 'F' | 'R' = 'F',
+): string {
+  return `<t:${Math.floor(utcMs / 1000)}:${style}>`;
+}
+
+/**
+ * Compact human-readable duration for short countdowns and status cards.
+ * Examples: "3d 4h", "4h 12m", "12m 30s", "now".
+ */
+export function formatDurationShort(ms: number): string {
+  const abs = Math.abs(ms);
+  if (abs < 1000) return 'now';
+
+  const seconds = Math.floor(abs / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) return `${days}d ${hours % 24}h`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+  return `${seconds}s`;
+}
+
+/**
+ * Format a UTC timestamp authored in `authorTz` as "Mon 2026-04-20 14:00 UTC-5".
+ * Useful in embeds where we want a concrete, unambiguous reference line below
+ * Discord's auto-localized `<t:...:F>` tag.
+ */
+export function formatInAuthoredZone(utcMs: number, authorTz: string): string {
+  const dt = DateTime.fromMillis(utcMs, { zone: authorTz });
+  if (!dt.isValid) return new Date(utcMs).toISOString();
+  const offset = formatOffset(dt.offset);
+  return `${dt.toFormat('ccc yyyy-MM-dd HH:mm')} ${offset}`;
+}
+
 export { ALL_ZONES };

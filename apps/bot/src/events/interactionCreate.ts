@@ -5,6 +5,8 @@ import {
   type InteractionReplyOptions,
 } from 'discord.js';
 import * as timezoneCmd from '../commands/timezone';
+import * as jamCmd from '../commands/jam';
+import * as jobCmd from '../commands/job';
 
 type CommandModule = {
   data: { name: string };
@@ -12,7 +14,11 @@ type CommandModule = {
   autocomplete?: (interaction: Interaction) => Promise<unknown>;
 };
 
-const commands = new Map<string, CommandModule>([['timezone', timezoneCmd as CommandModule]]);
+const commands = new Map<string, CommandModule>([
+  ['timezone', timezoneCmd as CommandModule],
+  ['jam', jamCmd as CommandModule],
+  ['job', jobCmd as CommandModule],
+]);
 
 export const name = Events.InteractionCreate;
 
