@@ -1052,6 +1052,7 @@ import {
 import { freshUrlFor } from '../artStorage';
 import type { DashboardRow } from './types';
 import { resolveDisplayName, resolveDisplayNames } from '../userNames';
+import { commandMention } from '../commandCache';
 
 const ART_PAGE_SIZE = 1; // one item at a time — gallery feel
 
@@ -1695,32 +1696,39 @@ function backToBrowseRow(): DashboardRow {
 async function showUploadGuide(
   interaction: MessageComponentInteraction<'cached'>,
 ): Promise<boolean> {
+  const mention = commandMention('art', 'upload');
+
   const embed = new EmbedBuilder()
     .setTitle('⬆️ Upload Art')
     .setColor(COLOR.PRIMARY)
     .setDescription(
-      'Discord modals can\'t accept file attachments, so uploads go through a slash command.',
+      `Click **${mention}** below to open the upload command — drag your file into the \`file\` option, type a title, and you're done.`,
     )
     .addFields(
       {
-        name: '1 · Run the command',
-        value:
-          '```/art upload file:<attach> title:My piece category:screenshot jam:1 tags:wip,boss```',
+        name: 'Required',
+        value: '`file` — drag & drop your image / GIF / video\n`title` — what to call it',
       },
       {
-        name: '2 · We archive it',
+        name: 'Optional',
         value:
-          'The bot forwards the file to a private storage channel so your upload keeps working even after Discord\'s CDN URLs expire.',
+          '`jam` — pick a jam (autocomplete) so it appears in that jam\'s gallery\n' +
+          '`category` — concept art, UI, animation, environment, character, logo, screenshot, reference, other\n' +
+          '`caption` — longer description\n' +
+          '`tags` — comma-separated keywords',
       },
       {
-        name: '3 · Browse it',
-        value: 'Your upload shows up in **My Board**, the jam gallery (if set), and the Home summary.',
+        name: 'Where it goes',
+        value:
+          'The bot re-hosts the file in a private storage channel so it never expires, then it shows up in **My Board**, the jam gallery (if you picked one), and the Home summary.',
       },
     )
     .setFooter({
       text: 'Supported: PNG, JPEG, WebP, GIF, APNG, MP4, WebM, MOV · max 25 MB',
     });
+
   await interaction.reply({
+    content: `➡️ ${mention}`,
     embeds: [embed],
     flags: MessageFlags.Ephemeral,
   });
