@@ -151,7 +151,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((sub) =>
     sub
       .setName('assign')
-      .setDescription('Assign a job to a member (Manage Server)')
+      .setDescription('Assign a job to a member')
       .addIntegerOption((o) =>
         o.setName('id').setDescription('Job ID').setRequired(true).setAutocomplete(true),
       )

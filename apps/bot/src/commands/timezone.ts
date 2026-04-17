@@ -42,7 +42,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((sub) =>
     sub
       .setName('set-for')
-      .setDescription("Set another member's timezone (Manage Server required)")
+      .setDescription("Set another member's timezone")
       .addUserOption((opt) =>
         opt.setName('user').setDescription('The member whose timezone to set').setRequired(true),
       )

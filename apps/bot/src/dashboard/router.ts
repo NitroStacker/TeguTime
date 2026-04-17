@@ -158,12 +158,8 @@ function ctxFor(
   interaction: MessageComponentInteraction<'cached'> | ModalSubmitInteraction<'cached'>,
   focusedJamId: number | null = null,
 ) {
-  return buildContext(
-    interaction.guild,
-    interaction.user.id,
-    interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) ?? false,
-    focusedJamId,
-  );
+  // Open-access policy: every member is elevated. See apps/bot/src/permissions.ts.
+  return buildContext(interaction.guild, interaction.user.id, true, focusedJamId);
 }
 
 async function replyError(
@@ -1871,11 +1867,16 @@ async function submitBio(interaction: ModalSubmitInteraction<'cached'>): Promise
 
 // -- Permission shorthands --
 
-function isAdminComp(interaction: MessageComponentInteraction<'cached'>): boolean {
-  return interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) ?? false;
+// Open-access policy — see apps/bot/src/permissions.ts for context and how
+// to revert. interaction arg retained so the signatures match cleanly if the
+// gate is re-enabled.
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function isAdminComp(_interaction: MessageComponentInteraction<'cached'>): boolean {
+  return true;
 }
-function isAdminModal(interaction: ModalSubmitInteraction<'cached'>): boolean {
-  return interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild) ?? false;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function isAdminModal(_interaction: ModalSubmitInteraction<'cached'>): boolean {
+  return true;
 }
 function denyAdmin(interaction: MessageComponentInteraction): Promise<boolean> {
   return interaction

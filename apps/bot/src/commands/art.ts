@@ -67,7 +67,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((sub) =>
     sub
       .setName('setup')
-      .setDescription('Admin: designate the storage channel for uploaded art')
+      .setDescription('Designate the storage channel for uploaded art')
       .addChannelOption((o) =>
         o
           .setName('channel')

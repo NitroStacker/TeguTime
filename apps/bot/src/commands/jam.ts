@@ -44,7 +44,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((sub) =>
     sub
       .setName('create')
-      .setDescription('Create a new jam (Manage Server)')
+      .setDescription('Create a new jam')
       .addStringOption((o) => o.setName('title').setDescription('Jam title').setRequired(true))
       .addStringOption((o) =>
         o.setName('start').setDescription('Start time — ' + TIME_FORMAT_HINT).setRequired(true),
@@ -91,7 +91,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((sub) =>
     sub
       .setName('edit')
-      .setDescription('Edit an existing jam (Manage Server)')
+      .setDescription('Edit an existing jam')
       .addIntegerOption((o) =>
         o
           .setName('id')
@@ -142,7 +142,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((sub) =>
     sub
       .setName('delete')
-      .setDescription('Delete a jam permanently (Manage Server)')
+      .setDescription('Delete a jam permanently')
       .addIntegerOption((o) =>
         o
           .setName('id')
@@ -154,7 +154,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((sub) =>
     sub
       .setName('archive')
-      .setDescription('Archive a jam (Manage Server)')
+      .setDescription('Archive a jam')
       .addIntegerOption((o) =>
         o
           .setName('id')

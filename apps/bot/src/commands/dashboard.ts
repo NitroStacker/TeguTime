@@ -10,7 +10,7 @@ import { isAdmin } from '../permissions';
 
 export const data = new SlashCommandBuilder()
   .setName('dashboard')
-  .setDescription('Post or move the TeguTime control panel (Manage Server)')
+  .setDescription('Post or move the TeguTime control panel')
   .setDMPermission(false)
   .addChannelOption((o) =>
     o
