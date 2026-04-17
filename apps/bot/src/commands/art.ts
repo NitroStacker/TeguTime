@@ -15,6 +15,7 @@ import {
   classifyMedia,
   getArtItem,
   getArtboard,
+  getJam,
   isArtCategory,
   listArtItems,
   listBoardOwners,
@@ -80,11 +81,19 @@ export const data = new SlashCommandBuilder()
     sub
       .setName('upload')
       .setDescription('Upload a piece of art/media to your board')
+      // Discord requires every required option before any optional one.
       .addAttachmentOption((o) =>
         o.setName('file').setDescription('Image, GIF, or video (≤25 MB)').setRequired(true),
       )
       .addStringOption((o) =>
         o.setName('title').setDescription('Title of the piece').setRequired(true),
+      )
+      .addIntegerOption((o) =>
+        o
+          .setName('jam')
+          .setDescription('Associated jam (pick "No jam" to keep it unassociated)')
+          .setRequired(true)
+          .setAutocomplete(true),
       )
       .addStringOption((o) =>
         o.setName('caption').setDescription('Optional description').setRequired(false),
@@ -95,13 +104,6 @@ export const data = new SlashCommandBuilder()
           .setDescription('Category')
           .addChoices(...ART_CATEGORIES.map((c) => ({ name: c, value: c })))
           .setRequired(false),
-      )
-      .addIntegerOption((o) =>
-        o
-          .setName('jam')
-          .setDescription('Associated jam')
-          .setRequired(false)
-          .setAutocomplete(true),
       )
       .addStringOption((o) =>
         o.setName('tags').setDescription('Comma-separated tags').setRequired(false),
@@ -188,11 +190,20 @@ export async function autocomplete(interaction: AutocompleteInteraction): Promis
 
   if (focused.name === 'jam') {
     const jams = listJams(db, interaction.guildId, { includeArchived: true });
-    const matches = jams
-      .filter((j) => !q || String(j.id) === q || j.title.toLowerCase().includes(q))
-      .slice(0, 25)
-      .map((j) => ({ name: `#${j.id} · ${j.title}`.slice(0, 100), value: j.id }));
-    await interaction.respond(matches);
+    const results: Array<{ name: string; value: number }> = [];
+
+    // Always include a "No jam" sentinel so the option can satisfy a required
+    // jam field without forcing association.
+    if (!q || 'none'.startsWith(q) || 'no jam'.includes(q) || q === '0') {
+      results.push({ name: '➖ No jam (unassociated)', value: 0 });
+    }
+
+    for (const j of jams) {
+      if (q && !(String(j.id) === q || j.title.toLowerCase().includes(q))) continue;
+      results.push({ name: `#${j.id} · ${j.title}`.slice(0, 100), value: j.id });
+      if (results.length >= 25) break;
+    }
+    await interaction.respond(results.slice(0, 25));
     return;
   }
   if (focused.name === 'id') {
@@ -286,7 +297,9 @@ async function handleUpload(interaction: ChatInputCommandInteraction<'cached'>):
   const caption = interaction.options.getString('caption')?.trim() || null;
   const categoryStr = interaction.options.getString('category');
   const category: ArtCategory | null = categoryStr && isArtCategory(categoryStr) ? categoryStr : null;
-  const jamId = interaction.options.getInteger('jam');
+  // `jam` is required; 0 is the "No jam" sentinel we surface in autocomplete.
+  const jamOpt = interaction.options.getInteger('jam', true);
+  const jamId: number | null = jamOpt === 0 ? null : jamOpt;
   const tags = parseTags(interaction.options.getString('tags'));
 
   if (file.size > MAX_UPLOAD_BYTES) {
@@ -300,6 +313,13 @@ async function handleUpload(interaction: ChatInputCommandInteraction<'cached'>):
   if (!media) {
     await interaction.reply({
       content: `❌ Unsupported file type \`${file.contentType ?? 'unknown'}\`. Use PNG/JPEG/WebP/GIF or MP4/WebM/MOV.`,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  if (jamId != null && !getJam(db, interaction.guildId, jamId)) {
+    await interaction.reply({
+      content: `❌ No jam with id \`${jamId}\`. Pick from the autocomplete or choose **No jam**.`,
       flags: MessageFlags.Ephemeral,
     });
     return;

@@ -1707,12 +1707,14 @@ async function showUploadGuide(
     .addFields(
       {
         name: 'Required',
-        value: '`file` — drag & drop your image / GIF / video\n`title` — what to call it',
+        value:
+          '`file` — drag & drop your image / GIF / video\n' +
+          '`title` — what to call it\n' +
+          '`jam` — pick a jam (autocompleted), or choose **"No jam"** to leave it unassociated',
       },
       {
         name: 'Optional',
         value:
-          '`jam` — pick a jam (autocomplete) so it appears in that jam\'s gallery\n' +
           '`category` — concept art, UI, animation, environment, character, logo, screenshot, reference, other\n' +
           '`caption` — longer description\n' +
           '`tags` — comma-separated keywords',
