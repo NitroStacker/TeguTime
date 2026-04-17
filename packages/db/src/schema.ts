@@ -29,6 +29,17 @@ export const pinnedSheets = sqliteTable('pinned_sheets', {
   updatedAt: integer('updated_at').notNull(),
 });
 
+// ---- Dashboard (Phase 2) ----
+
+export const dashboards = sqliteTable('dashboards', {
+  guildId: text('guild_id').primaryKey(),
+  channelId: text('channel_id').notNull(),
+  messageId: text('message_id').notNull(),
+  currentView: text('current_view').notNull().default('home'),
+  focusedJamId: integer('focused_jam_id'),
+  updatedAt: integer('updated_at').notNull(),
+});
+
 // ---- Jams (Phase 1b) ----
 
 export const jams = sqliteTable(
@@ -131,3 +142,4 @@ export type JamRow = typeof jams.$inferSelect;
 export type JamReminderRow = typeof jamReminders.$inferSelect;
 export type JobRow = typeof jobs.$inferSelect;
 export type JobCommentRow = typeof jobComments.$inferSelect;
+export type DashboardRow = typeof dashboards.$inferSelect;

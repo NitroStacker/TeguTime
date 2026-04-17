@@ -3,8 +3,14 @@ import { config } from './config';
 import { data as timezoneData } from './commands/timezone';
 import { data as jamData } from './commands/jam';
 import { data as jobData } from './commands/job';
+import { data as dashboardData } from './commands/dashboard';
 
-const commands = [timezoneData.toJSON(), jamData.toJSON(), jobData.toJSON()];
+const commands = [
+  dashboardData.toJSON(),
+  timezoneData.toJSON(),
+  jamData.toJSON(),
+  jobData.toJSON(),
+];
 const rest = new REST({ version: '10' }).setToken(config.token);
 
 try {

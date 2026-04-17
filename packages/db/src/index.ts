@@ -46,6 +46,16 @@ const BOOTSTRAP_SQL = `
     updated_at INTEGER NOT NULL
   );
 
+  -- Phase 2: dashboard
+  CREATE TABLE IF NOT EXISTS dashboards (
+    guild_id        TEXT    PRIMARY KEY,
+    channel_id      TEXT    NOT NULL,
+    message_id      TEXT    NOT NULL,
+    current_view    TEXT    NOT NULL DEFAULT 'home',
+    focused_jam_id  INTEGER,
+    updated_at      INTEGER NOT NULL
+  );
+
   -- Phase 1b: jams
   CREATE TABLE IF NOT EXISTS jams (
     id                       INTEGER PRIMARY KEY AUTOINCREMENT,
