@@ -1,0 +1,7 @@
+# Keep Windows batch/cmd scripts checked out with CRLF — cmd.exe requires it,
+# and pure-LF files silently fail (the window flashes for a second and exits).
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Default for everything else: let git auto-normalize.
+* text=auto
