@@ -1,49 +1,26 @@
 @echo off
-title TeguTime Bot
+rem ASCII-only to avoid OEM codepage issues.
+rem Launches the bot in a NEW cmd window that stays open regardless of
+rem what happens (cmd /k). If anything goes wrong the user sees the error
+rem there; this outer wrapper also writes a diagnostic log in case the
+rem new window also disappears somehow.
+
 cd /d "%~dp0"
 
-echo.
-echo  ===========================================
-echo    TeguTime Discord Bot
-echo  ===========================================
-echo.
-echo  Working directory: %CD%
-echo.
+set "LOG=%~dp0start-bot.log"
 
-echo  Node version:
-node --version
-if errorlevel 1 (
-  echo.
-  echo  [ERROR] Node.js is not installed or not on PATH.
-  echo  Install it from https://nodejs.org/ and try again.
-  goto HOLD
-)
+echo ==== TeguTime bot launcher ==== > "%LOG%"
+echo Time: %DATE% %TIME% >> "%LOG%"
+echo CD:   %CD% >> "%LOG%"
+echo --- node --- >> "%LOG%"
+node -v >> "%LOG%" 2>&1
+echo --- pnpm --- >> "%LOG%"
+pnpm -v >> "%LOG%" 2>&1
+echo --- launching bot window --- >> "%LOG%"
 
-echo  pnpm version:
-pnpm --version
-if errorlevel 1 (
-  echo.
-  echo  [ERROR] pnpm is not installed or not on PATH.
-  echo  Run this once in a new cmd window:   npm install -g pnpm
-  echo  Then restart Explorer (or log out and back in) so PATH refreshes.
-  goto HOLD
-)
+echo Launching TeguTime bot in a new window...
+start "TeguTime Bot" cmd /k "cd /d %~dp0 & echo Starting TeguTime... & echo. & pnpm start & echo. & echo Bot has exited. Close this window when you are done."
 
 echo.
-echo  Starting the bot — MINIMIZE this window; closing it stops the bot.
-echo  ===========================================
-echo.
-
-call pnpm start
-
-echo.
-echo  ===========================================
-echo    Bot exited with code %ERRORLEVEL%.
-echo  ===========================================
-
-:HOLD
-echo.
-echo  This window will stay open so you can see any errors above.
-echo  Close it to fully exit, or type  exit  and press Enter.
-echo.
-cmd /k
+echo If no window appeared, check start-bot.log in this folder.
+timeout /t 3 /nobreak >nul
