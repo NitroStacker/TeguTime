@@ -1,26 +1,16 @@
 @echo off
-rem Minimal launcher. Stays ASCII-only to avoid OEM-codepage issues.
+rem Thin wrapper that hands off to the PowerShell launcher.
+rem The .ps1 is where the real logic lives; PowerShell is more predictable
+rem than cmd for interactive scripts and doesn't have the batch-invocation
+rem quirks that were causing cmd windows to close unexpectedly.
 
 cd /d "%~dp0"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start-bot.ps1"
 
-set "LOG=%~dp0start-bot.log"
-
-echo ==== TeguTime bot launcher ==== > "%LOG%"
-echo Time: %DATE% %TIME% >> "%LOG%"
-echo CD:   %CD% >> "%LOG%"
-echo --- node --- >> "%LOG%"
-node -v >> "%LOG%" 2>&1
-echo --- pnpm --- >> "%LOG%"
-pnpm -v >> "%LOG%" 2>&1
-echo --- launching bot window --- >> "%LOG%"
-
-echo Launching TeguTime bot in a new window...
-rem `start` inherits our CWD, so no need to cd again inside /k. Keeping
-rem the /k argument to a single bare command avoids nested-quote parsing
-rem issues. `pnpm start` runs; when it exits, /k keeps the window open.
-start "TeguTime Bot" cmd /k pnpm start
-
-echo.
-echo A new "TeguTime Bot" window should be open now.
-echo If no window appeared, open start-bot.log in this folder.
-timeout /t 5 /nobreak >nul
+rem Safety net: if PowerShell itself failed to launch we still want to see
+rem why, so drop to an interactive prompt here.
+if errorlevel 1 (
+  echo.
+  echo [ERROR] PowerShell failed to run start-bot.ps1. Details above.
+  cmd /k
+)
