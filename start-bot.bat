@@ -1,9 +1,5 @@
 @echo off
-rem ASCII-only to avoid OEM codepage issues.
-rem Launches the bot in a NEW cmd window that stays open regardless of
-rem what happens (cmd /k). If anything goes wrong the user sees the error
-rem there; this outer wrapper also writes a diagnostic log in case the
-rem new window also disappears somehow.
+rem Minimal launcher. Stays ASCII-only to avoid OEM-codepage issues.
 
 cd /d "%~dp0"
 
@@ -19,8 +15,12 @@ pnpm -v >> "%LOG%" 2>&1
 echo --- launching bot window --- >> "%LOG%"
 
 echo Launching TeguTime bot in a new window...
-start "TeguTime Bot" cmd /k "cd /d %~dp0 & echo Starting TeguTime... & echo. & pnpm start & echo. & echo Bot has exited. Close this window when you are done."
+rem `start` inherits our CWD, so no need to cd again inside /k. Keeping
+rem the /k argument to a single bare command avoids nested-quote parsing
+rem issues. `pnpm start` runs; when it exits, /k keeps the window open.
+start "TeguTime Bot" cmd /k pnpm start
 
 echo.
-echo If no window appeared, check start-bot.log in this folder.
-timeout /t 3 /nobreak >nul
+echo A new "TeguTime Bot" window should be open now.
+echo If no window appeared, open start-bot.log in this folder.
+timeout /t 5 /nobreak >nul
