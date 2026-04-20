@@ -9,3 +9,6 @@ npm-debug.log*
 .DS_Store
 .vscode/
 .idea/
+
+# Diagnostic output written by start-bot.bat each launch.
+start-bot.log
